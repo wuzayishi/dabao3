@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>音频 → 单文件HTML播放器</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center;
+       background:linear-gradient(135deg,#1a1a2e,#16213e);font-family:-apple-system,sans-serif;color:#eee;padding:20px}
+  .card{width:100%;max-width:460px;background:#22293d;border-radius:16px;padding:28px;
+        box-shadow:0 10px 40px rgba(0,0,0,.4);text-align:center}
+  h1{font-size:19px;margin:0 0 6px}
+  p.sub{color:#9aa4bf;font-size:13px;margin:0 0 20px}
+  .drop{border:2px dashed #3a4a6b;border-radius:12px;padding:34px 16px;cursor:pointer;
+        transition:.2s;color:#8ea0c4;font-size:14px}
+  .drop.hover{border-color:#5b8def;background:rgba(91,141,239,.08);color:#cfe0ff}
+  .drop b{color:#5b8def}
+  input[type=text]{width:100%;margin-top:16px;padding:10px 12px;border-radius:8px;
+        border:1px solid #3a4a6b;background:#1a1f2e;color:#eee;font-size:14px}
+  button{margin-top:14px;width:100%;padding:12px;border:none;border-radius:8px;
+        background:#5b8def;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  button:disabled{background:#3a4a6b;cursor:not-allowed}
+  .status{margin-top:14px;font-size:13px;color:#7fd18a;min-height:18px}
+  audio{width:100%;margin-top:16px}
+  .tip{margin-top:18px;font-size:11px;color:#6b7690;line-height:1.6}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎵 音频 → 单文件播放器</h1>
+    <p class="sub">拖入音频，生成可双击播放的独立 HTML（音频已内嵌，零依赖、断网可放）</p>
+    <div class="drop" id="drop">
+      把 <b>MP3 / WAV / M4A / OGG</b> 拖到这里<br>或点击选择文件
+    </div>
+    <input type="file" id="file" accept="audio/*" hidden>
+    <input type="text" id="title" placeholder="歌名（可选）">
+    <button id="gen" disabled>生成播放器 HTML 并下载</button>
+    <div class="status" id="status"></div>
+    <audio id="preview" controls hidden></audio>
+    <div class="tip">全程在你本机浏览器完成，音频不会上传到任何服务器。</div>
+  </div>
+
+<script>
+const drop=document.getElementById('drop'),file=document.getElementById('file'),
+      gen=document.getElementById('gen'),status=document.getElementById('status'),
+      preview=document.getElementById('preview'),titleIn=document.getElementById('title');
+let b64='',mime='',objUrl='';
+
+function handle(f){
+  if(!f||!f.type.startsWith('audio/')){status.textContent='请选择音频文件';return;}
+  status.textContent='读取中…';
+  mime=f.type||'audio/mpeg';
+  const r=new FileReader();
+  r.onload=()=>{
+    b64=r.result.split(',')[1];
+    if(objUrl)URL.revokeObjectURL(objUrl);
+    objUrl=URL.createObjectURL(f);
+    preview.src=objUrl;preview.hidden=false;
+    status.textContent='已载入：'+f.name+'（'+ (f.size/1048576).toFixed(1) +' MB）';
+    gen.disabled=false;
+  };
+  r.readAsDataURL(f);
+}
+drop.onclick=()=>file.click();
+file.onchange=e=>handle(e.target.files[0]);
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('hover')};
+drop.ondragleave=()=>drop.classList.remove('hover');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('hover');handle(e.dataTransfer.files[0])};
+
+gen.onclick=()=>{
+  if(!b64)return;
+  const name=(titleIn.value.trim()||'My Song').replace(/</g,'&lt;');
+  const html=`<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${name}</title><style>
+body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;
+background:linear-gradient(135deg,#1a1a2e,#16213e);font-family:sans-serif;color:#fff}
+.box{text-align:center;width:90%;max-width:400px}
+h2{font-weight:500}audio{width:100%;margin-top:16px}
+</style></head><body><div class="box"><h2>🎵 ${name}</h2>
+<audio controls autoplay src="data:${mime};base64,${b64}"></audio>
+</div></body></html>`;
+  const blob=new Blob([html],{type:'text/html'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(name||'player')+'.html';
+  a.click();
+  status.textContent='✅ 已生成，双击下载的文件即可播放';
+};
+</script>
+</body>
+</html>
